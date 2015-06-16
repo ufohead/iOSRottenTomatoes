@@ -10,16 +10,18 @@
 #import "MovieCell.h"
 #import "ViewController.h"
 #import <UIImageView+AFNetworking.h>
+#import <MRProgress/MRProgress.h>
+
 
 @interface MovieViewController () < UITableViewDataSource, UITableViewDelegate >
 
 @property (weak, nonatomic) IBOutlet UITableView *tableView;
 @property (strong, nonatomic) NSArray *movies;
-
-
+@property (strong, nonatomic) UILabel *errorLabel;
 @end
 
 @implementation MovieViewController
+
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -31,23 +33,73 @@
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     
+    //api for search
+    //http://api.rottentomatoes.com/api/public/v1.0/movies.json?apikey=dagqdghwaq3e3mxyrp7kmmj5&q=Spy&page_limit=1
     
-    NSString *url = @"http://api.rottentomatoes.com/api/public/v1.0/lists/movies/box_office.json?apikey=dagqdghwaq3e3mxyrp7kmmj5&limit=20&country=us";
+    //NSString *url = @"http://api.rottentomatoes.com/api/public/v1.0/lists/movies/box_office.json?apikey=dagqdghwaq3e3mxyrp7kmmj5&limit=50&country=tw";
     
+    UIRefreshControl *refreshControl = [[UIRefreshControl alloc] init];
+    [refreshControl addTarget:self action:@selector(refresh:) forControlEvents:UIControlEventValueChanged];
+    [self.tableView addSubview:refreshControl];
+
+    if (self.errorLabel == nil) {
+        self.errorLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 50)];
+        self.errorLabel.backgroundColor=[UIColor grayColor];
+        self.errorLabel.text = @" Network Error!";
+        self.errorLabel.textAlignment = NSTextAlignmentCenter;
+    }
+    [self.tableView addSubview:self.errorLabel];
+
+    
+    self.queryApi;
+    NSLog(@"Init Query...");
+
+}
+
+
+-(void) queryApi {
+    
+    NSString *url = @"http://api.rottentomatoes.com/api/public/v1.0/lists/dvds/top_rentals.json?apikey=dagqdghwaq3e3mxyrp7kmmj5&limit=50&country=tw";
     NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:url]];
+    
+    [MRProgressOverlayView showOverlayAddedTo:self.tableView animated:YES];
+
     [NSURLConnection sendAsynchronousRequest:request queue:[NSOperationQueue mainQueue] completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-        NSDictionary * dict = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        self.movies = dict[@"movies"];
-        [self.tableView reloadData];
-        //NSArray * movies = dict[@"movies"];
-        //NSDictionary * firstMovie = movies[0];
-        //NSLog(@"%@", firstMovie);
-        //NSLog(@"%@", object);
+        NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
+        int code = [httpResponse statusCode];
+        if (code!=200){
+            NSLog(@"Connection Error");
+            self.errorLabel.hidden = NO;
+        }
+        else {
+            NSLog(@"Connection Well");
+            self.errorLabel.hidden = YES;
+            
+            NSDictionary * dict = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            self.movies = dict[@"movies"];
+            [self.tableView reloadData];
+        }
+        [MRProgressOverlayView dismissOverlayForView:self.tableView animated:YES];
+
+        //[self.tableView insertSubview:refreshControl atIndex:0];
+        
     }];
 }
 
 
+
+- (void)refresh:(UIRefreshControl *)refreshControl {
+    //- no use [refreshControl beginRefreshing];
+
+    self.queryApi;
+    NSLog(@"more Query...");
+    [refreshControl endRefreshing];
+    //refreshControl.attributedTitle = [[NSAttributedString alloc] initWithString:@"Loading..."];
+}
+
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
@@ -75,7 +127,6 @@
     //posterURLString = [self convertPosterUrlStringToHighRes:posterURLString];
     [cell.posterView setImageWithURL:[NSURL URLWithString:posterURLString]];
     //NSLog(@"%@",posterURLString);
-    
     //NSString * title = movie[@"title"];
     //cell.textLabel.text = title;
 
@@ -102,9 +153,7 @@
     // Pass the selected object to the new view controller.
     MovieCell * cell = sender;
     NSIndexPath *indexPath =  [self.tableView indexPathForCell:cell];
-    NSDictionary * movie = self.movies[indexPath.row];
-
-    
+    NSDictionary * movie = self.movies[indexPath.row];    
     
     ViewController *destinationVC = segue.destinationViewController;
     destinationVC.movie = movie;

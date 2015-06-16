@@ -4,7 +4,7 @@
 target 'RottenTomatoes' do
 
     pod "AFNetworking"
-
+    pod 'MRProgress'
 end
 
 target 'RottenTomatoesTests' do
